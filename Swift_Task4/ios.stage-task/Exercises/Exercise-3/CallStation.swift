@@ -3,7 +3,7 @@ import Foundation
 final class CallStation {
     var usersList: Set<User> = []
     var callsList: [Call] = []
-    var currentCallUsersList: Array<User> = []
+    var currentCallUsersList: [User:Call] = [:]
 }
 
 extension User: Hashable {
@@ -38,16 +38,39 @@ extension CallStation: Station {
             
             let call = Call(id: callID, incomingUser: user2, outgoingUser: user1, status: .calling)
             callsList.append(call)
-            currentCallUsersList.append(user1)
-            currentCallUsersList.append(user2)
+            currentCallUsersList[user1] = call
+            currentCallUsersList[user2] = call
             
             return call.id
             
             
-        case .end:
-            return nil
-        case .answer(from: let from):
-            return nil
+        case .end(from: let user1):
+            let callID = currentCallUsersList[user1]?.outgoingUser.id
+            
+            if currentCallUsersList[user1] != nil && currentCallUsersList[user1]?.status == .talk {
+                callsList.removeFirst()
+                let call = Call(id: callID!, incomingUser: currentCallUsersList[user1]!.incomingUser, outgoingUser: user1, status: .ended(reason: .end))
+                callsList.append(call)
+                currentCallUsersList[currentCallUsersList[user1]!.incomingUser] = nil
+                currentCallUsersList[user1] = nil
+            }
+            
+            
+            
+            return callID
+        
+        case .answer(from: let answeringUser):
+            let callID = currentCallUsersList[answeringUser]?.outgoingUser.id
+            
+            if currentCallUsersList[answeringUser] != nil && currentCallUsersList[answeringUser]?.status == .calling {
+                callsList.removeFirst()
+                let call = Call(id: callID!, incomingUser: answeringUser, outgoingUser: currentCallUsersList[answeringUser]!.outgoingUser, status: .talk)
+                callsList.append(call)
+                currentCallUsersList[currentCallUsersList[answeringUser]!.outgoingUser] = call
+                currentCallUsersList[answeringUser] = call
+            }
+            
+            return callID
         }
         return nil
     }
@@ -65,8 +88,6 @@ extension CallStation: Station {
     }
     
     func currentCall(user: User) -> Call? {
-        if currentCallUsersList.contains(user) {
-            return 
-        }
+            return currentCallUsersList[user]
     }
 }
